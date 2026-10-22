@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <application>
+        <!-- Debug builds only: lets `adb shell am broadcast` add fake messages from any app. -->
+        <receiver
+            android:name=".FakeMessageReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="com.paulesthor.casper.FAKE" />
+            </intent-filter>
+        </receiver>
+    </application>
+</manifest>

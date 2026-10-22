@@ -26,7 +26,13 @@ En local avec Android Studio : lancer un émulateur, puis
 ./gradlew assembleDebug
 ./scripts/emulator-test.sh
 ```
-Pour tester à la main avec de faux messages :
+Pour ajouter de faux messages qui semblent venir d'une app précise (version de test uniquement) :
+```
+adb shell "am broadcast -a com.paulesthor.casper.FAKE -p com.paulesthor.casper --es app whatsapp --es from Lea --es text 'Tu viens samedi ?' --ei ago 90"
+```
+`app` : whatsapp, instagram, messenger, sms ou appel · `ago` : il y a combien de minutes · `--es group Coloc` pour un groupe.
+
+Pour tester la vraie capture des notifications :
 ```
 adb shell "cmd notification post -S messaging --conversation Lea --message 'Lea:Tu viens samedi' t1 x"
 ```
