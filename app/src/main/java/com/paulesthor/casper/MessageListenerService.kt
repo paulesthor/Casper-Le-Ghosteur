@@ -1,4 +1,4 @@
-package com.paulesthor.arepondre
+package com.paulesthor.casper
 
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
@@ -26,7 +26,7 @@ class MessageListenerService : NotificationListenerService() {
     }
 
     companion object {
-        const val TAG = "ARepondre"
+        const val TAG = "Casper"
 
         /** Set by the visible screen so it can refresh live. */
         @Volatile

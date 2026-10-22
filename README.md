@@ -1,4 +1,4 @@
-# À répondre
+# Casper
 
 App Android qui lit les notifications de messages (WhatsApp, Instagram, Messenger, SMS, Telegram…) et garde la liste des conversations auxquelles tu n'as pas encore répondu.
 
@@ -8,9 +8,9 @@ Pour l'instant elle fait trois choses :
 - elle les affiche regroupés par conversation, avec un bouton « Répondu ✅ ».
 
 ## Installer sur le téléphone
-1. Onglet **Actions** du repo → dernier run vert → artefact `a-repondre-apk` → dézipper → `app-debug.apk`.
+1. Onglet **Actions** du repo → dernier run vert → artefact `casper-apk` → dézipper → `app-debug.apk`.
 2. Ouvrir l'APK sur le téléphone (autoriser « installer des apps inconnues »).
-3. Ouvrir l'app → « Autoriser l'accès aux notifications » → activer **À répondre**.
+3. Ouvrir l'app → « Autoriser l'accès aux notifications » → activer **Casper**.
 
 ## Tester sur un émulateur
 La CI le fait automatiquement (job `emulator`) : elle installe l'app sur un émulateur Android 14, poste une notification de chat et une notification normale, puis vérifie que seule la première est captée. Le log et une capture d'écran sont dans l'artefact `emulator-results`.

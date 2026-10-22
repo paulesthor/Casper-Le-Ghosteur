@@ -1,4 +1,4 @@
-package com.paulesthor.arepondre
+package com.paulesthor.casper
 
 import android.content.ContentValues
 import android.content.Context

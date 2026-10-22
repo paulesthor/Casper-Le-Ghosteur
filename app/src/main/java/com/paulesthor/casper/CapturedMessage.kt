@@ -1,4 +1,4 @@
-package com.paulesthor.arepondre
+package com.paulesthor.casper
 
 data class CapturedMessage(
     val app: String,

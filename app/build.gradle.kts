@@ -4,11 +4,11 @@ plugins {
 }
 
 android {
-    namespace = "com.paulesthor.arepondre"
+    namespace = "com.paulesthor.casper"
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "com.paulesthor.arepondre"
+        applicationId = "com.paulesthor.casper"
         minSdk = 26
         targetSdk = 35
         versionCode = 1

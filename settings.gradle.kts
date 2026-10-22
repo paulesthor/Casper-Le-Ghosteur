@@ -12,5 +12,5 @@ dependencyResolutionManagement {
         mavenCentral()
     }
 }
-rootProject.name = "a-repondre"
+rootProject.name = "casper"
 include(":app")

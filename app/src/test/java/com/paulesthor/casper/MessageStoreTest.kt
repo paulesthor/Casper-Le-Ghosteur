@@ -1,4 +1,4 @@
-package com.paulesthor.arepondre
+package com.paulesthor.casper
 
 import androidx.test.core.app.ApplicationProvider
 import org.junit.Assert.assertEquals

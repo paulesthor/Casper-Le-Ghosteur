@@ -3,7 +3,7 @@
 # notification access, posts fake notifications and checks what got captured.
 set -euo pipefail
 
-PKG=com.paulesthor.arepondre
+PKG=com.paulesthor.casper
 APK=${1:-app/build/outputs/apk/debug/app-debug.apk}
 
 adb wait-for-device
@@ -19,7 +19,7 @@ adb shell "cmd notification post -S messaging --conversation Lea --message 'Lea:
 adb shell "cmd notification post -t 'Mise a jour' other1 'Batterie chargee'"
 sleep 5
 
-adb logcat -d -s ARepondre:I > capture.log
+adb logcat -d -s Casper:I > capture.log
 cat capture.log
 
 fail=0
