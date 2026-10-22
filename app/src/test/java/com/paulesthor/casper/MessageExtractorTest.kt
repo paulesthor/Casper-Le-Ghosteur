@@ -157,4 +157,24 @@ class MessageExtractorTest {
 
         assertEquals(null, MessageExtractor.extract("com.whatsapp", n, 5000)!!.repliedAt)
     }
+
+    @Test
+    fun instagramDirectMessageIsNamedAfterTheSenderNotTheAccount() {
+        // Instagram titles its notifications with the user's own username.
+        val me = Person.Builder().setName("paul.esthor").build()
+        val julie = Person.Builder().setName("julie_92").build()
+        val n = builder()
+            .setContentTitle("paul.esthor")
+            .setStyle(
+                NotificationCompat.MessagingStyle(me)
+                    .setConversationTitle("paul.esthor")
+                    .setGroupConversation(false)
+                    .addMessage("t'as vu ma story ?", 1000, julie)
+            )
+            .build()
+
+        val extraction = MessageExtractor.extract("com.instagram.android", n, 5000)!!
+        assertEquals("julie_92", extraction.conversation)
+        assertEquals("julie_92", extraction.messages.single().conversation)
+    }
 }

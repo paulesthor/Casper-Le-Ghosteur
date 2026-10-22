@@ -75,8 +75,12 @@ object MessageExtractor {
         postTime: Long,
     ): Extraction? {
         val me = style.user.name?.toString()
-        val title = (style.conversationTitle ?: notification.extras.getCharSequence(Notification.EXTRA_TITLE))
-            ?.toString()?.trim()?.takeIf { it.isNotEmpty() }
+        // Only a group chat is named by its title. In a one-to-one chat the title can be
+        // anything: Instagram puts the user's own username there, not the sender's.
+        val groupTitle = style.conversationTitle?.toString()?.trim()
+            ?.takeIf { it.isNotEmpty() && style.isGroupConversation }
+        val title = notification.extras.getCharSequence(Notification.EXTRA_TITLE)?.toString()?.trim()
+            ?.takeIf { it.isNotEmpty() && it != me }
 
         var repliedAt: Long? = null
         val messages = mutableListOf<Pair<String, NotificationCompat.MessagingStyle.Message>>()
@@ -91,7 +95,7 @@ object MessageExtractor {
             }
         }
 
-        val conversation = title ?: messages.firstOrNull()?.first ?: return null
+        val conversation = groupTitle ?: messages.firstOrNull()?.first ?: title ?: return null
         return Extraction(
             app = app,
             conversation = conversation,
