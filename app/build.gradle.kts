@@ -26,6 +26,14 @@ android {
         }
     }
 
+    buildTypes {
+        // The version shared with others: no test shortcuts, signed with the same key
+        // so it installs over (and is updated by) any other build.
+        getByName("release") {
+            signingConfig = signingConfigs.getByName("debug")
+        }
+    }
+
     buildFeatures {
         buildConfig = true
     }

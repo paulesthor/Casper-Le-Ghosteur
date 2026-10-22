@@ -14,12 +14,40 @@ jobs:
           distribution: temurin
           java-version: 17
       - uses: gradle/actions/setup-gradle@v4
-      - name: Build APK and run unit tests
-        run: ./gradlew assembleDebug testDebugUnitTest
+      - name: Build APKs and run unit tests
+        run: ./gradlew assembleDebug assembleRelease testDebugUnitTest
       - uses: actions/upload-artifact@v4
         with:
           name: casper-apk
           path: app/build/outputs/apk/debug/app-debug.apk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: casper-release
+          path: app/build/outputs/apk/release/app-release.apk
+
+  # Public download link that always points to the latest version:
+  # https://github.com/<owner>/<repo>/releases/latest/download/casper.apk
+  release:
+    needs: build
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: casper-release
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mv app-release.apk casper.apk
+          gh release create "v${{ github.run_number }}" casper.apk \
+            --repo "${{ github.repository }}" \
+            --target "${{ github.sha }}" \
+            --title "Casper ${{ github.run_number }}" \
+            --notes "Installer : télécharger casper.apk sur le téléphone et l'ouvrir." \
+            --latest
 
   emulator:
     needs: build
