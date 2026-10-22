@@ -4,43 +4,51 @@ import android.app.Activity
 import android.app.AlertDialog
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.content.res.ColorStateList
 import android.os.Bundle
 import android.provider.Settings
 import android.text.format.DateUtils
-import android.widget.ArrayAdapter
-import android.widget.Button
-import android.widget.LinearLayout
+import android.view.View
+import android.view.ViewGroup
+import android.widget.BaseAdapter
+import android.widget.ImageButton
 import android.widget.ListView
 import android.widget.TextView
 import androidx.core.app.NotificationManagerCompat
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
 
 class MainActivity : Activity() {
 
     private lateinit var store: MessageStore
-    private lateinit var status: TextView
-    private lateinit var grantButton: Button
+    private lateinit var subtitle: TextView
+    private lateinit var permissionCard: View
     private lateinit var list: ListView
-    private var conversations: List<Conversation> = emptyList()
+    private lateinit var empty: View
+    private val adapter = ConversationAdapter()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         store = MessageStore(this)
+        setContentView(R.layout.activity_main)
 
-        val padding = (16 * resources.displayMetrics.density).toInt()
-        status = TextView(this).apply { setPadding(padding, padding, padding, padding / 2) }
-        grantButton = Button(this).apply {
-            text = "Autoriser l'accès aux notifications"
-            setOnClickListener { startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)) }
+        subtitle = findViewById(R.id.subtitle)
+        permissionCard = findViewById(R.id.permission_card)
+        list = findViewById(R.id.list)
+        empty = findViewById(R.id.empty)
+
+        findViewById<View>(R.id.grant_button).setOnClickListener {
+            startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
         }
-        list = ListView(this).apply {
-            setOnItemClickListener { _, _, position, _ -> showConversation(conversations[position]) }
+        list.adapter = adapter
+        list.setOnItemClickListener { _, _, position, _ -> showConversation(adapter.getItem(position)) }
+
+        // Android 15+ draws apps edge-to-edge: keep content out of the status and navigation bars.
+        ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.root)) { view, insets ->
+            val bars = insets.getInsets(WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.displayCutout())
+            view.setPadding(bars.left, bars.top, bars.right, bars.bottom)
+            WindowInsetsCompat.CONSUMED
         }
-        setContentView(LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            addView(status)
-            addView(grantButton)
-            addView(list)
-        })
     }
 
     override fun onResume() {
@@ -56,42 +64,83 @@ class MainActivity : Activity() {
 
     private fun refresh() {
         val granted = packageName in NotificationManagerCompat.getEnabledListenerPackages(this)
-        grantButton.visibility = if (granted) Button.GONE else Button.VISIBLE
+        permissionCard.visibility = if (granted) View.GONE else View.VISIBLE
 
-        conversations = store.pendingConversations()
-        status.text = when {
-            !granted -> "L'app n'a pas encore accès aux notifications."
-            conversations.isEmpty() -> "Rien en attente 🎉"
-            else -> "${conversations.size} conversation(s) en attente de réponse"
+        val conversations = store.pendingConversations()
+        adapter.conversations = conversations
+        adapter.notifyDataSetChanged()
+        empty.visibility = if (conversations.isEmpty()) View.VISIBLE else View.GONE
+
+        subtitle.text = when (conversations.size) {
+            0 -> if (granted) "Tout est à jour" else "En attente d'autorisation"
+            1 -> "1 personne attend ta réponse"
+            else -> "${conversations.size} personnes attendent ta réponse"
         }
-        list.adapter = ArrayAdapter(
-            this,
-            android.R.layout.simple_list_item_1,
-            conversations.map {
-                val ago = DateUtils.getRelativeTimeSpanString(it.lastTimestamp)
-                "${it.conversation} · ${appLabel(it.app)} · ${it.count} msg · $ago\n${it.lastText}"
-            },
-        )
+    }
+
+    private fun markHandled(c: Conversation) {
+        store.markHandled(c.app, c.conversation)
+        refresh()
     }
 
     private fun showConversation(c: Conversation) {
         val body = store.pendingMessages(c.app, c.conversation).joinToString("\n\n") {
-            "${it.sender} (${DateUtils.getRelativeTimeSpanString(it.timestamp)}) :\n${it.text}"
+            "${it.sender} · ${timeAgo(it.timestamp)}\n${it.text}"
         }
         AlertDialog.Builder(this)
-            .setTitle("${c.conversation} — ${appLabel(c.app)}")
+            .setTitle("${c.conversation} · ${appLabel(c.app)}")
             .setMessage(body)
-            .setPositiveButton("Répondu ✅") { _, _ ->
-                store.markHandled(c.app, c.conversation)
-                refresh()
-            }
+            .setPositiveButton("Répondu ✓") { _, _ -> markHandled(c) }
             .setNegativeButton("Fermer", null)
             .show()
     }
+
+    private fun timeAgo(timestamp: Long): CharSequence = DateUtils.getRelativeTimeSpanString(
+        timestamp, System.currentTimeMillis(), DateUtils.MINUTE_IN_MILLIS, DateUtils.FORMAT_ABBREV_RELATIVE,
+    )
 
     private fun appLabel(pkg: String): String = try {
         packageManager.getApplicationLabel(packageManager.getApplicationInfo(pkg, 0)).toString()
     } catch (e: PackageManager.NameNotFoundException) {
         pkg
+    }
+
+    private fun appColor(pkg: String): Int = when (pkg) {
+        "com.whatsapp", "com.whatsapp.w4b" -> 0xFF25D366
+        "com.instagram.android" -> 0xFFE1306C
+        "com.facebook.orca" -> 0xFF0A7CFF
+        "org.telegram.messenger" -> 0xFF2AABEE
+        "com.snapchat.android" -> 0xFFF7D000
+        "com.google.android.apps.messaging", "com.samsung.android.messaging" -> 0xFF4C8DF6
+        "com.discord" -> 0xFF5865F2
+        else -> 0xFF9AA8FF
+    }.toInt()
+
+    private inner class ConversationAdapter : BaseAdapter() {
+        var conversations: List<Conversation> = emptyList()
+
+        override fun getCount() = conversations.size
+        override fun getItem(position: Int) = conversations[position]
+        override fun getItemId(position: Int) = position.toLong()
+
+        override fun getView(position: Int, convertView: View?, parent: ViewGroup): View {
+            val view = convertView ?: layoutInflater.inflate(R.layout.item_conversation, parent, false)
+            val c = conversations[position]
+            val color = appColor(c.app)
+
+            view.findViewById<TextView>(R.id.avatar).text =
+                c.conversation.firstOrNull { it.isLetterOrDigit() }?.uppercase() ?: "?"
+            view.findViewById<View>(R.id.app_dot).backgroundTintList = ColorStateList.valueOf(color)
+            view.findViewById<TextView>(R.id.name).text = c.conversation
+            view.findViewById<TextView>(R.id.time).text = timeAgo(c.lastTimestamp)
+            view.findViewById<TextView>(R.id.app).apply {
+                text = appLabel(c.app)
+                setTextColor(color)
+            }
+            view.findViewById<TextView>(R.id.preview).text = c.lastText
+            view.findViewById<TextView>(R.id.count).text = c.count.toString()
+            view.findViewById<ImageButton>(R.id.done).setOnClickListener { markHandled(c) }
+            return view
+        }
     }
 }

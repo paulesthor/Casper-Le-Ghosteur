@@ -1,0 +1,12 @@
+<resources>
+    <color name="night">#0F1229</color>
+    <color name="surface">#1B2042</color>
+    <color name="surface_high">#262C57</color>
+    <color name="ghost">#F5F7FF</color>
+    <color name="ghost_shade">#C9D2F2</color>
+    <color name="accent">#9AA8FF</color>
+    <color name="text_primary">#F5F7FF</color>
+    <color name="text_secondary">#9AA3C9</color>
+    <color name="ink">#1B1F3B</color>
+    <color name="blush">#FFB3C7</color>
+</resources>
