@@ -9,4 +9,6 @@
     <color name="text_secondary">#9AA3C9</color>
     <color name="ink">#1B1F3B</color>
     <color name="blush">#FFB3C7</color>
+    <color name="warning">#FFC46B</color>
+    <color name="urgent">#FF7A8A</color>
 </resources>

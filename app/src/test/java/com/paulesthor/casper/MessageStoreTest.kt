@@ -28,4 +28,21 @@ class MessageStoreTest {
         store.markHandled("com.whatsapp", "Léa")
         assertEquals(listOf("julie_92"), store.pendingConversations().map { it.conversation })
     }
+
+    @Test
+    fun longestWaitingConversationComesFirst() {
+        store.insert(
+            listOf(
+                CapturedMessage("com.whatsapp", "Tom", "Tom", "ancien", 1000),
+                CapturedMessage("com.instagram.android", "julie_92", "julie_92", "milieu", 2000),
+                CapturedMessage("com.whatsapp", "Tom", "Tom", "récent", 9000),
+            )
+        )
+
+        val pending = store.pendingConversations()
+        assertEquals(listOf("Tom", "julie_92"), pending.map { it.conversation })
+        assertEquals(1000, pending[0].firstTimestamp)
+        assertEquals(9000, pending[0].lastTimestamp)
+        assertEquals("récent", pending[0].lastText)
+    }
 }

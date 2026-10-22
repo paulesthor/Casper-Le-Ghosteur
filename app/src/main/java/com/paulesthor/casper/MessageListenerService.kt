@@ -11,7 +11,7 @@ class MessageListenerService : NotificationListenerService() {
     override fun onNotificationPosted(sbn: StatusBarNotification) {
         if (sbn.packageName == packageName) return
         val messages = try {
-            MessageExtractor.extract(sbn.packageName, sbn.notification, sbn.postTime)
+            MessageExtractor.extract(sbn.packageName, sbn.notification, sbn.postTime, testApps)
         } catch (e: Exception) {
             Log.w(TAG, "Could not read notification from ${sbn.packageName}", e)
             return
@@ -27,6 +27,9 @@ class MessageListenerService : NotificationListenerService() {
 
     companion object {
         const val TAG = "Casper"
+
+        /** Debug builds also accept fake messages posted with `adb shell cmd notification post`. */
+        private val testApps = if (BuildConfig.DEBUG) setOf("com.android.shell") else emptySet()
 
         /** Set by the visible screen so it can refresh live. */
         @Volatile

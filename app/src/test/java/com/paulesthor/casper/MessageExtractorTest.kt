@@ -91,4 +91,39 @@ class MessageExtractorTest {
             assertTrue(MessageExtractor.extract("x", n, 0).isEmpty())
         }
     }
+
+    @Test
+    fun appsOutsideTheListAreIgnored() {
+        val lea = Person.Builder().setName("Léa").build()
+        val n = builder()
+            .setStyle(NotificationCompat.MessagingStyle(Person.Builder().setName("Moi").build()).addMessage("yo", 1000, lea))
+            .build()
+
+        assertTrue(MessageExtractor.extract("com.discord", n, 0).isEmpty())
+        assertEquals(1, MessageExtractor.extract("com.discord", n, 0, extraApps = setOf("com.discord")).size)
+    }
+
+    @Test
+    fun missedCallIsKeptWithCallerAsConversation() {
+        val n = builder()
+            .setCategory("missed_call")
+            .setContentTitle("Appel manqué")
+            .setContentText("Maman")
+            .setWhen(7000)
+            .build()
+
+        assertEquals(
+            listOf(CapturedMessage("com.google.android.dialer", "Maman", "Maman", MessageExtractor.MISSED_CALL_TEXT, 7000)),
+            MessageExtractor.extract("com.google.android.dialer", n, 9000),
+        )
+    }
+
+    @Test
+    fun ongoingAndIncomingCallsAreIgnored() {
+        val incoming = builder().setCategory(Notification.CATEGORY_CALL).setContentTitle("Appel entrant").setContentText("Maman").build()
+        val ongoing = builder().setCategory(Notification.CATEGORY_CALL).setContentTitle("Appel en cours").setOngoing(true).build()
+
+        assertTrue(MessageExtractor.extract("com.google.android.dialer", incoming, 0).isEmpty())
+        assertTrue(MessageExtractor.extract("com.google.android.dialer", ongoing, 0).isEmpty())
+    }
 }

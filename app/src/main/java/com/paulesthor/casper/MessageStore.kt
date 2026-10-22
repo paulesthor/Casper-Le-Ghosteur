@@ -11,6 +11,8 @@ data class Conversation(
     val count: Int,
     val lastText: String,
     val lastTimestamp: Long,
+    /** When the oldest unanswered message arrived: how long this person has been waiting. */
+    val firstTimestamp: Long,
 )
 
 class MessageStore(context: Context) :
@@ -63,19 +65,19 @@ class MessageStore(context: Context) :
 
     fun pendingConversations(): List<Conversation> {
         val sql = """
-            SELECT app, conversation, COUNT(*), MAX(ts),
+            SELECT app, conversation, COUNT(*), MAX(ts), MIN(ts),
                    (SELECT text FROM messages m2
                      WHERE m2.app = m.app AND m2.conversation = m.conversation AND m2.handled = 0
                      ORDER BY ts DESC LIMIT 1)
             FROM messages m
             WHERE handled = 0
             GROUP BY app, conversation
-            ORDER BY MAX(ts) DESC
+            ORDER BY MIN(ts)
         """.trimIndent()
         return readableDatabase.rawQuery(sql, null).use { c ->
             buildList {
                 while (c.moveToNext()) {
-                    add(Conversation(c.getString(0), c.getString(1), c.getInt(2), c.getString(4), c.getLong(3)))
+                    add(Conversation(c.getString(0), c.getString(1), c.getInt(2), c.getString(5), c.getLong(3), c.getLong(4)))
                 }
             }
         }

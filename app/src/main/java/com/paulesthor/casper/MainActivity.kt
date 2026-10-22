@@ -108,13 +108,23 @@ class MainActivity : Activity() {
     private fun appColor(pkg: String): Int = when (pkg) {
         "com.whatsapp", "com.whatsapp.w4b" -> 0xFF25D366
         "com.instagram.android" -> 0xFFE1306C
-        "com.facebook.orca" -> 0xFF0A7CFF
-        "org.telegram.messenger" -> 0xFF2AABEE
-        "com.snapchat.android" -> 0xFFF7D000
-        "com.google.android.apps.messaging", "com.samsung.android.messaging" -> 0xFF4C8DF6
-        "com.discord" -> 0xFF5865F2
+        "com.facebook.orca", "com.facebook.mlite" -> 0xFF0A7CFF
+        "com.google.android.apps.messaging", "com.samsung.android.messaging", "com.android.mms" -> 0xFF4C8DF6
+        in MessageExtractor.DIALER_APPS -> 0xFF34C759
         else -> 0xFF9AA8FF
     }.toInt()
+
+    /** The longer someone has been waiting, the warmer the color. */
+    private fun waitingColor(since: Long): Int {
+        val hours = (System.currentTimeMillis() - since) / DateUtils.HOUR_IN_MILLIS
+        return getColor(
+            when {
+                hours >= 24 -> R.color.urgent
+                hours >= 3 -> R.color.warning
+                else -> R.color.text_secondary
+            }
+        )
+    }
 
     private inner class ConversationAdapter : BaseAdapter() {
         var conversations: List<Conversation> = emptyList()
@@ -132,7 +142,10 @@ class MainActivity : Activity() {
                 c.conversation.firstOrNull { it.isLetterOrDigit() }?.uppercase() ?: "?"
             view.findViewById<View>(R.id.app_dot).backgroundTintList = ColorStateList.valueOf(color)
             view.findViewById<TextView>(R.id.name).text = c.conversation
-            view.findViewById<TextView>(R.id.time).text = timeAgo(c.lastTimestamp)
+            view.findViewById<TextView>(R.id.time).apply {
+                text = timeAgo(c.firstTimestamp)
+                setTextColor(waitingColor(c.firstTimestamp))
+            }
             view.findViewById<TextView>(R.id.app).apply {
                 text = appLabel(c.app)
                 setTextColor(color)
