@@ -15,6 +15,17 @@ android {
         versionName = "0.1"
     }
 
+    // A fixed debug key (instead of each machine's own) so a newer APK can be
+    // installed over an older one, whichever machine or CI run built it.
+    signingConfigs {
+        getByName("debug") {
+            storeFile = file("debug.keystore")
+            storePassword = "android"
+            keyAlias = "androiddebugkey"
+            keyPassword = "android"
+        }
+    }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
