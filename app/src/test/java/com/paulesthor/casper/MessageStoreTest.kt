@@ -71,4 +71,20 @@ class MessageStoreTest {
         store.deleteRule(id)
         assertEquals(emptyList<ReminderRule>(), store.rules())
     }
+
+    @Test
+    fun ignoreCanBeUndoneExactly() {
+        store.insert(listOf(CapturedMessage("com.whatsapp", "Léa", "Léa", "ancien", 1000)))
+        store.markHandled("com.whatsapp", "Léa")
+        store.insert(listOf(CapturedMessage("com.whatsapp", "Léa", "Léa", "nouveau", 5000)))
+        store.saveReminderState("com.whatsapp", "Léa", ReminderState(lastRemindedAt = 4242))
+
+        val undo = store.ignore("com.whatsapp", "Léa")
+        assertEquals(emptyList<Conversation>(), store.pendingConversations())
+
+        store.undo(undo)
+        // Only what "ignore" took away comes back, with its reminder state.
+        assertEquals(listOf("nouveau"), store.pendingMessages("com.whatsapp", "Léa").map { it.text })
+        assertEquals(ReminderState(lastRemindedAt = 4242), store.reminderState("com.whatsapp", "Léa"))
+    }
 }

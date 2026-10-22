@@ -14,6 +14,7 @@ class MessageListenerService : NotificationListenerService() {
 
         val inserted = store.insert(extraction.messages)
         ConversationOpener.remember(app, conversation, sbn.notification.contentIntent)
+        ConversationOpener.rememberReply(app, conversation, sbn.notification)
         extraction.messages.forEach {
             Log.i(TAG, "captured app=${it.app} conversation=${it.conversation} sender=${it.sender} text=${it.text}")
         }

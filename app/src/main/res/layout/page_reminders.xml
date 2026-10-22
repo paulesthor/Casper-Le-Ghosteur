@@ -35,6 +35,19 @@
             android:paddingHorizontal="8dp"
             android:paddingTop="28dp"
             android:paddingBottom="10dp"
+            android:text="Plage calme" />
+
+        <include
+            android:id="@+id/quiet_rule"
+            layout="@layout/item_rule" />
+
+        <TextView
+            style="@style/Text.Section"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:paddingHorizontal="8dp"
+            android:paddingTop="28dp"
+            android:paddingBottom="10dp"
             android:text="Personnes suivies" />
 
         <LinearLayout

@@ -1,3 +1,7 @@
 <resources>
     <string name="app_name">Casper</string>
+    <string name="widget_small_label">Casper</string>
+    <string name="widget_wide_label">Casper (large)</string>
+    <string name="widget_small_description">Combien de personnes attendent ta réponse</string>
+    <string name="widget_wide_description">Combien de personnes t\'attendent, et les plus urgentes</string>
 </resources>

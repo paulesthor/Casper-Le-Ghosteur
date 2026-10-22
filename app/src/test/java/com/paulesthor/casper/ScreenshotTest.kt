@@ -51,6 +51,18 @@ class ScreenshotTest {
                 CapturedMessage("com.google.android.apps.messaging", "06 12 34 56 78", "06 12 34 56 78", "Votre colis arrive demain entre 9h et 13h", now - 12 * 60_000),
             )
         )
+        // A real-looking WhatsApp notification for Léa, so the quick reply is available.
+        val replyAction = androidx.core.app.NotificationCompat.Action.Builder(
+            0, "Répondre",
+            android.app.PendingIntent.getBroadcast(
+                ApplicationProvider.getApplicationContext(), 0, android.content.Intent("reply"),
+                android.app.PendingIntent.FLAG_MUTABLE,
+            ),
+        ).addRemoteInput(androidx.core.app.RemoteInput.Builder("text").setLabel("Message").build()).build()
+        val notification = androidx.core.app.NotificationCompat.Builder(ApplicationProvider.getApplicationContext(), "x")
+            .setSmallIcon(android.R.drawable.ic_dialog_info).addAction(replyAction).build()
+        ConversationOpener.rememberReply("com.whatsapp", "Léa", notification)
+
         store.saveRule(ReminderRule(person = "Maman", groups = setOf(AppGroup.WHATSAPP, AppGroup.SMS, AppGroup.CALLS), delayMinutes = 60, repeatMinutes = 60))
         store.saveRule(ReminderRule(person = "Coloc", groups = setOf(AppGroup.WHATSAPP), delayMinutes = 180))
         store.saveRule(ReminderRule(person = "Hugo Martin", groups = setOf(AppGroup.MESSENGER), delayMinutes = 30, enabled = false))
@@ -80,11 +92,59 @@ class ScreenshotTest {
 
         activity.findViewById<View>(R.id.tab_inbox).performClick()
         settle()
-        val list = activity.findViewById<android.widget.ListView>(R.id.list)
-        list.performItemClick(list.getChildAt(1), 1, 1)
+        val list = activity.findViewById<androidx.recyclerview.widget.RecyclerView>(R.id.list)
+        list.getChildAt(1).findViewById<View>(R.id.card).performClick()
         // No app installed in tests, so the conversation sheet opens instead.
         settle()
         saveWithSheet(activity.window.decorView, ShadowDialog.getLatestDialog(), "$theme-4-conversation")
+        ShadowDialog.getLatestDialog().dismiss()
+
+        // Léa is the 4th card; open her quick reply as a right swipe would.
+        Sheets.showReply(activity, MessageStore.get(activity).pendingConversations()[3]) {}
+        settle()
+        saveWithSheet(activity.window.decorView, ShadowDialog.getLatestDialog(), "$theme-5-reply")
+        ShadowDialog.getLatestDialog().dismiss()
+
+        activity.findViewById<View>(R.id.tab_reminders).performClick()
+        settle()
+        activity.findViewById<View>(R.id.quiet_rule).findViewById<View>(R.id.card).performClick()
+        settle()
+        saveWithSheet(activity.window.decorView, ShadowDialog.getLatestDialog(), "$theme-6-quiet")
+        ShadowDialog.getLatestDialog().dismiss()
+
+        if (theme == "light") widgets(activity)
+    }
+
+    /** The widgets for 0, 3 and 10 people waiting, on a plain wallpaper. */
+    private fun widgets(activity: android.app.Activity) {
+        val density = activity.resources.displayMetrics.density
+        val sheet = Bitmap.createBitmap((400 * density).toInt(), (560 * density).toInt(), Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(sheet)
+        canvas.drawColor(0xFF3A2F4F.toInt())
+        val store = MessageStore.get(activity)
+        fun draw(layout: Int, x: Float, y: Float, w: Int, h: Int) {
+            val parent = android.widget.FrameLayout(activity)
+            val view = CasperWidget.views(activity, layout).apply(activity, parent)
+            parent.addView(view, android.widget.FrameLayout.LayoutParams((w * density).toInt(), (h * density).toInt()))
+            parent.measure(
+                View.MeasureSpec.makeMeasureSpec((w * density).toInt(), View.MeasureSpec.EXACTLY),
+                View.MeasureSpec.makeMeasureSpec((h * density).toInt(), View.MeasureSpec.EXACTLY),
+            )
+            parent.layout(0, 0, parent.measuredWidth, parent.measuredHeight)
+            canvas.save()
+            canvas.translate(x * density, y * density)
+            parent.draw(canvas)
+            canvas.restore()
+        }
+        val pending = store.pendingConversations()
+        pending.forEach { store.markHandled(it.app, it.conversation) }
+        draw(R.layout.widget_small, 20f, 20f, 170, 170)
+        val now = System.currentTimeMillis()
+        store.insert((1..3).map { CapturedMessage("com.whatsapp", "Ami $it", "Ami $it", "yo", now - it * 3_600_000L) })
+        draw(R.layout.widget_small, 210f, 20f, 170, 170)
+        store.insert((4..10).map { CapturedMessage("com.whatsapp", "Ami $it", "Ami $it", "yo", now - it * 3_600_000L) })
+        draw(R.layout.widget_wide, 20f, 210f, 360, 170)
+        write(sheet, "widgets")
     }
 
     private fun settle() {

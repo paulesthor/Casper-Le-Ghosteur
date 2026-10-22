@@ -8,6 +8,9 @@ Ce qu'elle fait :
 - toucher une conversation **l'ouvre directement dans son app** (appui long : le détail) ;
 - elle voit quand tu as répondu : réponse depuis la notification, ou conversation ouverte dans l'app (réglable) ;
 - **rappels** : par personne (« Maman : après 1 h, puis toutes les heures ») ou pour tout le monde (« après 24 h ») ;
+- **gestes** : glisser à gauche pour ignorer (avec « Annuler »), à droite pour répondre sans ouvrir l'app ;
+- **plage calme** : pas de rappels la nuit (heures et jours réglables, rappels reportés ou annulés) ;
+- **widgets** : le fantôme dort, s'inquiète ou panique selon le nombre de personnes qui t'attendent ;
 - thème clair ou sombre selon le téléphone.
 
 ## Captures sans téléphone

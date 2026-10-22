@@ -19,7 +19,7 @@ data class Conversation(
 data class Person(val name: String, val groups: Set<AppGroup>)
 
 class MessageStore(context: Context) :
-    SQLiteOpenHelper(context.applicationContext, "messages.db", null, 2) {
+    SQLiteOpenHelper(context.applicationContext, "messages.db", null, 3) {
 
     override fun onCreate(db: SQLiteDatabase) {
         db.execSQL(
@@ -32,6 +32,7 @@ class MessageStore(context: Context) :
                 text TEXT NOT NULL,
                 ts INTEGER NOT NULL,
                 handled INTEGER NOT NULL DEFAULT 0,
+                handled_at INTEGER,
                 UNIQUE(app, conversation, sender, text, ts)
             )
             """.trimIndent()
@@ -41,6 +42,7 @@ class MessageStore(context: Context) :
 
     override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
         if (oldVersion < 2) createReminderTables(db)
+        if (oldVersion < 3) db.execSQL("ALTER TABLE messages ADD COLUMN handled_at INTEGER")
     }
 
     private fun createReminderTables(db: SQLiteDatabase) {
@@ -129,17 +131,39 @@ class MessageStore(context: Context) :
         }
 
     /** Marks messages up to [upTo] as answered; later ones stay pending. */
-    fun markHandled(app: String, conversation: String, upTo: Long = Long.MAX_VALUE): Int {
+    fun markHandled(app: String, conversation: String, upTo: Long = Long.MAX_VALUE): Int =
+        handle(app, conversation, upTo, System.currentTimeMillis())
+
+    private fun handle(app: String, conversation: String, upTo: Long, at: Long): Int {
         val changed = writableDatabase.compileStatement(
-            "UPDATE messages SET handled = 1 WHERE app = ? AND conversation = ? AND handled = 0 AND ts <= ?"
+            "UPDATE messages SET handled = 1, handled_at = ? WHERE app = ? AND conversation = ? AND handled = 0 AND ts <= ?"
         ).run {
-            bindString(1, app)
-            bindString(2, conversation)
-            bindLong(3, upTo)
+            bindLong(1, at)
+            bindString(2, app)
+            bindString(3, conversation)
+            bindLong(4, upTo)
             executeUpdateDelete()
         }
         if (pendingConversation(app, conversation) == null) clearReminderState(app, conversation)
         return changed
+    }
+
+    /** What "ignore" changed, so it can be put back exactly as it was. */
+    data class Undo(val app: String, val conversation: String, val handledAt: Long, val reminders: ReminderState)
+
+    /** Takes a conversation off the list without answering it. */
+    fun ignore(app: String, conversation: String): Undo {
+        val undo = Undo(app, conversation, System.currentTimeMillis(), reminderState(app, conversation))
+        handle(app, conversation, Long.MAX_VALUE, undo.handledAt)
+        return undo
+    }
+
+    fun undo(undo: Undo) {
+        writableDatabase.execSQL(
+            "UPDATE messages SET handled = 0, handled_at = NULL WHERE app = ? AND conversation = ? AND handled_at = ?",
+            arrayOf(undo.app, undo.conversation, undo.handledAt),
+        )
+        if (undo.reminders != ReminderState()) saveReminderState(undo.app, undo.conversation, undo.reminders)
     }
 
     /** Everyone seen so far, most recent first, to pick who gets their own reminder. */

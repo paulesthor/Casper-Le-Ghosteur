@@ -12,15 +12,16 @@ import android.provider.Settings as SystemSettings
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import android.widget.BaseAdapter
 import android.widget.LinearLayout
-import android.widget.ListView
 import android.widget.Switch
 import android.widget.TextView
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
+import androidx.recyclerview.widget.ItemTouchHelper
+import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.recyclerview.widget.RecyclerView
 
 class MainActivity : Activity() {
 
@@ -32,6 +33,8 @@ class MainActivity : Activity() {
     private lateinit var tabReminders: TextView
     private val adapter = ConversationAdapter()
     private var showingReminders = false
+    private lateinit var snack: View
+    private val hideSnack = Runnable { snack.visibility = View.GONE }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -60,14 +63,13 @@ class MainActivity : Activity() {
         findViewById<View>(R.id.grant_button).setOnClickListener {
             startActivity(Intent(SystemSettings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
         }
-        findViewById<ListView>(R.id.list).apply {
+        findViewById<RecyclerView>(R.id.list).apply {
+            layoutManager = LinearLayoutManager(this@MainActivity)
             adapter = this@MainActivity.adapter
-            setOnItemClickListener { _, _, position, _ -> openConversation(this@MainActivity.adapter.getItem(position)) }
-            setOnItemLongClickListener { _, _, position, _ ->
-                Sheets.showConversation(this@MainActivity, this@MainActivity.adapter.getItem(position)) { refresh() }
-                true
-            }
+            ItemTouchHelper(SwipeActions(this@MainActivity, ::ignore, ::reply)).attachToRecyclerView(this)
         }
+        snack = findViewById(R.id.snack)
+        snack.background = GlassDrawable(this, 27f, sheet = true)
         findViewById<View>(R.id.add_person).setOnClickListener {
             Sheets.showPeople(this) { person ->
                 Sheets.showRule(
@@ -120,6 +122,41 @@ class MainActivity : Activity() {
         ConversationOpener.open(this, app, conversation)
     }
 
+    private fun ignore(position: Int) {
+        val c = adapter.conversations[position]
+        val undo = ReminderScheduler.ignore(this, c.app, c.conversation)
+        refresh()
+        showSnack("<b>${android.text.Html.escapeHtml(c.conversation)}</b> ignoré", "Annuler") {
+            ReminderScheduler.undo(this, undo)
+            refresh()
+        }
+    }
+
+    private fun reply(position: Int) {
+        val c = adapter.conversations[position]
+        // The card springs back; it leaves the list once the answer is sent.
+        adapter.notifyItemChanged(position)
+        Sheets.showReply(this, c) { name ->
+            refresh()
+            showSnack("Envoyé à <b>${android.text.Html.escapeHtml(name)}</b>", null, null)
+        }
+    }
+
+    private fun showSnack(html: String, action: String?, onAction: (() -> Unit)?) {
+        snack.removeCallbacks(hideSnack)
+        findViewById<TextView>(R.id.snack_text).text = android.text.Html.fromHtml(html, 0)
+        findViewById<TextView>(R.id.snack_action).apply {
+            visibility = if (action == null) View.GONE else View.VISIBLE
+            text = action
+            setOnClickListener {
+                onAction?.invoke()
+                hideSnack.run()
+            }
+        }
+        snack.visibility = View.VISIBLE
+        snack.postDelayed(hideSnack, 4000)
+    }
+
     private fun openConversation(c: Conversation) {
         if (!ConversationOpener.open(this, c.app, c.conversation)) {
             Sheets.showConversation(this, c) { refresh() }
@@ -149,8 +186,7 @@ class MainActivity : Activity() {
         val granted = packageName in NotificationManagerCompat.getEnabledListenerPackages(this)
         findViewById<View>(R.id.permission_card).visibility = if (granted) View.GONE else View.VISIBLE
 
-        adapter.conversations = conversations
-        adapter.notifyDataSetChanged()
+        adapter.update(conversations)
         val empty = conversations.isEmpty()
         findViewById<View>(R.id.empty).visibility = if (empty) View.VISIBLE else View.GONE
         findViewById<View>(R.id.inbox_section).visibility = if (empty) View.GONE else View.VISIBLE
@@ -181,6 +217,20 @@ class MainActivity : Activity() {
                 onClick = { Sheets.showRule(this, rule, seenOn) { refresh() } },
             )
             container.addView(row)
+        }
+
+        val quiet = settings.quietHours
+        findViewById<View>(R.id.quiet_rule).let { row ->
+            showIcon(row, R.drawable.ic_moon)
+            bindRuleRow(
+                row,
+                name = "Pas de rappels la nuit",
+                line1 = "De <b>${QuietHours.formatMinute(quiet.startMinute)}</b> à <b>${QuietHours.formatMinute(quiet.endMinute)}</b> · ${Sheets.describeDays(quiet.days)}",
+                line2 = if (quiet.postpone) "Les rappels attendent la fin de la plage" else "Les rappels sont annulés",
+                checked = quiet.enabled,
+                onToggle = { settings.quietHours = settings.quietHours.copy(enabled = it); ReminderScheduler.reschedule(this) },
+                onClick = { Sheets.showQuiet(this) { refresh() } },
+            )
         }
 
         val general = settings.generalRule
@@ -244,28 +294,45 @@ class MainActivity : Activity() {
         if (onClick != null) card.setOnClickListener { onClick() } else card.isClickable = false
     }
 
-    private inner class ConversationAdapter : BaseAdapter() {
+    private inner class ConversationAdapter : RecyclerView.Adapter<ConversationAdapter.Holder>() {
         var conversations: List<Conversation> = emptyList()
+            private set
 
-        override fun getCount() = conversations.size
-        override fun getItem(position: Int) = conversations[position]
-        override fun getItemId(position: Int) = position.toLong()
+        inner class Holder(view: View) : RecyclerView.ViewHolder(view)
 
-        override fun getView(position: Int, convertView: View?, parent: ViewGroup): View {
-            val view = convertView ?: layoutInflater.inflate(R.layout.item_conversation, parent, false).also {
-                it.findViewById<View>(R.id.card).background = GlassDrawable(this@MainActivity, 26f)
-            }
+        fun update(list: List<Conversation>) {
+            conversations = list
+            @Suppress("NotifyDataSetChanged")
+            notifyDataSetChanged()
+        }
+
+        override fun getItemCount() = conversations.size
+
+        override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): Holder {
+            val view = layoutInflater.inflate(R.layout.item_conversation, parent, false)
+            view.findViewById<View>(R.id.card).background = GlassDrawable(this@MainActivity, 26f)
+            return Holder(view)
+        }
+
+        override fun onBindViewHolder(holder: Holder, position: Int) {
+            val view = holder.itemView
             val c = conversations[position]
             view.findViewById<View>(R.id.avatar_frame).bindAvatar(c.conversation, AppGroup.orDefault(c.app))
             view.findViewById<TextView>(R.id.name).text = c.conversation
             view.findViewById<TextView>(R.id.wait).showWaiting(c.firstTimestamp)
             view.findViewById<TextView>(R.id.preview).text = c.lastText
             view.findViewById<TextView>(R.id.count).text = c.count.toString()
+            view.findViewById<View>(R.id.card).apply {
+                setOnClickListener { openConversation(c) }
+                setOnLongClickListener {
+                    Sheets.showConversation(this@MainActivity, c) { refresh() }
+                    true
+                }
+            }
             view.findViewById<View>(R.id.done).setOnClickListener {
                 ReminderScheduler.markReplied(this@MainActivity, c.app, c.conversation)
                 refresh()
             }
-            return view
         }
     }
 

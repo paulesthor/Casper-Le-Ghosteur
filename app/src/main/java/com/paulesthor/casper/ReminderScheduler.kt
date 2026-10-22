@@ -16,6 +16,8 @@ import androidx.core.app.NotificationManagerCompat
 /**
  * Sends "X is waiting for your answer" notifications. A single alarm is kept for the
  * next reminder due; when it rings, every due reminder is sent and the alarm is moved on.
+ * Everything that changes the pending conversations goes through [reschedule], which
+ * also refreshes the home screen widgets.
  */
 object ReminderScheduler {
 
@@ -23,6 +25,7 @@ object ReminderScheduler {
     const val SNOOZE_MINUTES = 30
 
     fun reschedule(context: Context) {
+        CasperWidget.updateAll(context)
         val now = System.currentTimeMillis()
         val next = dueReminders(context).minOfOrNull { it.second }
         val alarms = context.getSystemService(AlarmManager::class.java)
@@ -39,9 +42,11 @@ object ReminderScheduler {
     fun fireDue(context: Context) {
         val store = MessageStore.get(context)
         val now = System.currentTimeMillis()
+        // Only reachable when quiet hours drop reminders; postponed ones are due after the window.
+        val quiet = Settings(context).quietHours.endOf(now) != null
         for ((conversation, due) in dueReminders(context)) {
             if (due > now) continue
-            notify(context, conversation)
+            if (!quiet) notify(context, conversation)
             store.saveReminderState(conversation.app, conversation.conversation, ReminderState(lastRemindedAt = now))
         }
         reschedule(context)
@@ -64,6 +69,18 @@ object ReminderScheduler {
         reschedule(context)
     }
 
+    fun ignore(context: Context, app: String, conversation: String): MessageStore.Undo {
+        val undo = MessageStore.get(context).ignore(app, conversation)
+        cancelNotification(context, app, conversation)
+        reschedule(context)
+        return undo
+    }
+
+    fun undo(context: Context, undo: MessageStore.Undo) {
+        MessageStore.get(context).undo(undo)
+        reschedule(context)
+    }
+
     fun cancelNotification(context: Context, app: String, conversation: String) {
         NotificationManagerCompat.from(context).cancel(notificationId(app, conversation))
     }
@@ -71,12 +88,16 @@ object ReminderScheduler {
     private fun dueReminders(context: Context): List<Pair<Conversation, Long>> {
         val store = MessageStore.get(context)
         val rules = store.rules()
-        val general = Settings(context).generalRule
+        val settings = Settings(context)
+        val general = settings.generalRule
+        val quiet = settings.quietHours
+        val now = System.currentTimeMillis()
         return store.pendingConversations().mapNotNull { c ->
             val rule = Reminders.ruleFor(c.conversation, c.app, rules, general) ?: return@mapNotNull null
             val due = Reminders.nextDue(c.firstTimestamp, rule, store.reminderState(c.app, c.conversation))
                 ?: return@mapNotNull null
-            c to due
+            // A reminder falling in the quiet hours waits for them to end.
+            c to if (quiet.postpone) quiet.endOf(maxOf(due, now)) ?: due else due
         }
     }
 

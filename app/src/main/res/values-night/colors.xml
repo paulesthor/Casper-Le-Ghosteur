@@ -17,5 +17,6 @@
     <color name="on_accent">#2A0717</color>
     <color name="warning">#FFC27A</color>
     <color name="urgent">#FF6B7D</color>
+    <color name="swipe_ignore">#7A3A52</color>
     <color name="scrim">#800F0008</color>
 </resources>

@@ -1,16 +1,19 @@
 package com.paulesthor.casper
 
 import android.app.Activity
+import android.app.TimePickerDialog
 import android.text.Html
 import android.text.format.DateFormat
 import android.text.format.DateUtils
 import android.view.LayoutInflater
 import android.view.View
+import android.view.WindowManager
+import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.TextView
 import java.util.Calendar
 
-/** The bottom sheets: a conversation's messages, a person's reminder, and picking a person. */
+/** The bottom sheets: messages, quick reply, reminders, quiet hours, picking a person. */
 object Sheets {
 
     private val DELAYS = listOf(15, 30, 60, 3 * 60, 24 * 60)
@@ -28,29 +31,7 @@ object Sheets {
                 "${group.label} · attend depuis ${Reminders.formatWait(System.currentTimeMillis() - c.firstTimestamp)}"
         }
 
-        val container = dialog.findViewById<LinearLayout>(R.id.messages)
-        var lastDay = ""
-        for (m in store.pendingMessages(c.app, c.conversation)) {
-            val day = dayLabel(activity, m.timestamp)
-            if (day != lastDay) {
-                container.addView(TextView(activity, null, 0, R.style.Text_Body).apply {
-                    text = day
-                    textSize = 11f
-                    setPadding(activity.dp(4f), activity.dp(10f), 0, activity.dp(4f))
-                })
-                lastDay = day
-            }
-            container.addView(TextView(activity, null, 0, R.style.Text).apply {
-                val showSender = m.sender != c.conversation
-                text = if (showSender) Html.fromHtml("<b>${Html.escapeHtml(m.sender)}</b><br>${Html.escapeHtml(m.text)}", 0) else m.text
-                textSize = 15f
-                setLineSpacing(0f, 1.2f)
-                background = activity.getDrawable(R.drawable.bg_bubble)
-                setPadding(activity.dp(14f), activity.dp(10f), activity.dp(14f), activity.dp(10f))
-                layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT)
-                    .apply { topMargin = activity.dp(6f); marginEnd = activity.dp(48f) }
-            })
-        }
+        addMessages(activity, dialog.findViewById(R.id.messages), c, store.pendingMessages(c.app, c.conversation))
         dialog.findViewById<View>(R.id.scroll).limitHeight(380f)
 
         dialog.findViewById<TextView>(R.id.secondary).apply {
@@ -69,6 +50,170 @@ object Sheets {
             }
         }
         dialog.show()
+    }
+
+    /**
+     * Answers a conversation from Casper through the app's own reply button. If the app
+     * doesn't offer one (or not anymore), offers to open the conversation instead.
+     * [onSent] gets the person's name once the message is sent.
+     */
+    fun showReply(activity: Activity, c: Conversation, onSent: (String) -> Unit) {
+        val store = MessageStore.get(activity)
+        val group = AppGroup.orDefault(c.app)
+        val dialog = activity.bottomSheet(R.layout.sheet_reply)
+        dialog.window?.setSoftInputMode(
+            WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE or WindowManager.LayoutParams.SOFT_INPUT_STATE_VISIBLE
+        )
+
+        dialog.findViewById<View>(R.id.head).apply {
+            bindAvatar(c.conversation, group)
+            findViewById<TextView>(R.id.name).text = c.conversation
+            findViewById<TextView>(R.id.sub).text =
+                "${group.label} · attend depuis ${Reminders.formatWait(System.currentTimeMillis() - c.firstTimestamp)}"
+        }
+        val recent = store.pendingMessages(c.app, c.conversation).takeLast(4)
+        addMessages(activity, dialog.findViewById(R.id.messages), c, recent, withDays = false)
+        dialog.findViewById<View>(R.id.scroll).limitHeight(260f)
+
+        val composer = dialog.findViewById<View>(R.id.composer)
+        val hint = dialog.findViewById<TextView>(R.id.hint)
+        val open = dialog.findViewById<TextView>(R.id.open)
+        fun offerToOpen(why: String) {
+            composer.visibility = View.GONE
+            hint.text = why
+            open.visibility = View.VISIBLE
+            open.text = "Ouvrir ${group.label}"
+            open.setOnClickListener {
+                dialog.dismiss()
+                ConversationOpener.open(activity, c.app, c.conversation)
+            }
+        }
+
+        if (!ConversationOpener.canReply(c.app, c.conversation)) {
+            offerToOpen("${group.label} ne permet pas de répondre depuis Casper pour ce message.")
+        } else {
+            hint.text = "Envoyé directement dans ${group.label}, sans l'ouvrir"
+            val input = dialog.findViewById<EditText>(R.id.input)
+            input.requestFocus()
+            dialog.findViewById<View>(R.id.send).setOnClickListener {
+                val text = input.text.toString().trim()
+                if (text.isEmpty()) return@setOnClickListener
+                if (ConversationOpener.reply(activity, c.app, c.conversation, text)) {
+                    ReminderScheduler.markReplied(activity, c.app, c.conversation)
+                    dialog.dismiss()
+                    onSent(c.conversation)
+                } else {
+                    offerToOpen("${group.label} n'accepte plus de réponse d'ici. Ton message n'est pas parti.")
+                }
+            }
+        }
+        dialog.show()
+    }
+
+    private fun addMessages(
+        activity: Activity,
+        container: LinearLayout,
+        c: Conversation,
+        messages: List<CapturedMessage>,
+        withDays: Boolean = true,
+    ) {
+        var lastDay = ""
+        for (m in messages) {
+            val day = dayLabel(activity, m.timestamp)
+            if (withDays && day != lastDay) {
+                container.addView(TextView(activity, null, 0, R.style.Text_Body).apply {
+                    text = day
+                    textSize = 11f
+                    setPadding(activity.dp(4f), activity.dp(10f), 0, activity.dp(4f))
+                })
+                lastDay = day
+            }
+            container.addView(TextView(activity, null, 0, R.style.Text).apply {
+                val showSender = m.sender != c.conversation
+                text = if (showSender) Html.fromHtml("<b>${Html.escapeHtml(m.sender)}</b><br>${Html.escapeHtml(m.text)}", 0) else m.text
+                textSize = 15f
+                setLineSpacing(0f, 1.2f)
+                background = activity.getDrawable(R.drawable.bg_bubble)
+                setPadding(activity.dp(14f), activity.dp(10f), activity.dp(14f), activity.dp(10f))
+                layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT)
+                    .apply { topMargin = activity.dp(6f); marginEnd = activity.dp(48f) }
+            })
+        }
+    }
+
+    fun showQuiet(activity: Activity, onSaved: () -> Unit) {
+        val settings = Settings(activity)
+        var quiet = settings.quietHours
+        val dialog = activity.bottomSheet(R.layout.sheet_quiet)
+        val start = dialog.findViewById<TextView>(R.id.start)
+        val end = dialog.findViewById<TextView>(R.id.end)
+        val summary = dialog.findViewById<TextView>(R.id.summary)
+
+        fun refresh() {
+            start.text = QuietHours.formatMinute(quiet.startMinute)
+            end.text = QuietHours.formatMinute(quiet.endMinute)
+            val from = QuietHours.formatMinute(quiet.startMinute)
+            val to = QuietHours.formatMinute(quiet.endMinute)
+            summary.text = Html.fromHtml(
+                if (quiet.postpone) {
+                    val example = QuietHours.formatMinute((quiet.startMinute + 90) % (24 * 60))
+                    "Si quelqu'un devait être rappelé à <b>$example</b>, tu reçois le rappel à <b>$to</b>."
+                } else {
+                    "Les rappels prévus entre <b>$from</b> et <b>$to</b> ne sont pas envoyés."
+                },
+                0,
+            )
+        }
+
+        fun pickTime(minute: Int, onPicked: (Int) -> Unit) {
+            TimePickerDialog(activity, { _, h, m -> onPicked(h * 60 + m); refresh() }, minute / 60, minute % 60, true).show()
+        }
+        dialog.findViewById<View>(R.id.start_tile).setOnClickListener { pickTime(quiet.startMinute) { quiet = quiet.copy(startMinute = it) } }
+        dialog.findViewById<View>(R.id.end_tile).setOnClickListener { pickTime(quiet.endMinute) { quiet = quiet.copy(endMinute = it) } }
+
+        val days = dialog.findViewById<LinearLayout>(R.id.days)
+        for ((index, entry) in QuietHours.WEEK.withIndex()) {
+            val (day, letter) = entry
+            days.addView(TextView(activity, null, 0, R.style.Text_Chip).apply {
+                text = letter
+                setPadding(0, 0, 0, 0)
+                isSelected = day in quiet.days
+                layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+                    .apply { if (index > 0) marginStart = activity.dp(6f) }
+                setOnClickListener {
+                    val chosen = if (day in quiet.days) quiet.days - day else quiet.days + day
+                    if (chosen.isNotEmpty()) quiet = quiet.copy(days = chosen)
+                    isSelected = day in quiet.days
+                }
+            })
+        }
+
+        chips(dialog.findViewById(R.id.modes), listOf(1, 0), { if (quiet.postpone) 1 else 0 }, {
+            if (it == 1) "Rappels reportés à la fin" else "Rappels annulés"
+        }) {
+            quiet = quiet.copy(postpone = it == 1)
+            refresh()
+        }
+        refresh()
+
+        dialog.findViewById<View>(R.id.secondary).setOnClickListener { dialog.dismiss() }
+        dialog.findViewById<View>(R.id.primary).setOnClickListener {
+            settings.quietHours = quiet
+            dialog.dismiss()
+            ReminderScheduler.reschedule(activity)
+            onSaved()
+        }
+        dialog.show()
+    }
+
+    fun describeDays(days: Set<Int>): String {
+        val weekend = setOf(java.util.Calendar.SATURDAY, java.util.Calendar.SUNDAY)
+        return when (days) {
+            QuietHours.ALL_DAYS -> "tous les jours"
+            QuietHours.ALL_DAYS - weekend -> "en semaine"
+            weekend -> "le week-end"
+            else -> QuietHours.WEEK.filter { it.first in days }.joinToString(" ") { it.second }
+        }
     }
 
     fun showPeople(activity: Activity, onPicked: (Person) -> Unit) {

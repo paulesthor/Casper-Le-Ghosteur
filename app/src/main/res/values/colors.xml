@@ -18,6 +18,7 @@
     <color name="on_accent">#FFFFFF</color>
     <color name="warning">#C96A00</color>
     <color name="urgent">#D81B47</color>
+    <color name="swipe_ignore">#B9768F</color>
     <color name="scrim">#29500A28</color>
 
     <!-- Same in both themes -->
