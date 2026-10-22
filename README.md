@@ -2,10 +2,16 @@
 
 App Android qui lit les notifications de messages (WhatsApp, Instagram, Messenger, SMS, Telegram…) et garde la liste des conversations auxquelles tu n'as pas encore répondu.
 
-Pour l'instant elle fait trois choses :
-- elle capte chaque notification et **ne garde que les messages** (pas les likes, mises à jour, musique, résumés de groupe…) ;
-- elle les stocke **uniquement sur le téléphone** (SQLite), sans doublons ;
-- elle les affiche regroupés par conversation, avec un bouton « Répondu ✅ ».
+Ce qu'elle fait :
+- elle ne garde que les messages **WhatsApp, Instagram, Messenger, SMS** et les **appels manqués**, stockés uniquement sur le téléphone ;
+- elle les affiche par conversation, **la personne qui attend depuis le plus longtemps en haut** ;
+- toucher une conversation **l'ouvre directement dans son app** (appui long : le détail) ;
+- elle voit quand tu as répondu : réponse depuis la notification, ou conversation ouverte dans l'app (réglable) ;
+- **rappels** : par personne (« Maman : après 1 h, puis toutes les heures ») ou pour tout le monde (« après 24 h ») ;
+- thème clair ou sombre selon le téléphone.
+
+## Captures sans téléphone
+`./gradlew testDebugUnitTest -Pscreenshots` génère les écrans dans `app/build/screenshots/`.
 
 ## Installer sur le téléphone
 1. Onglet **Actions** du repo → dernier run vert → artefact `casper-apk` → dézipper → `app-debug.apk`.

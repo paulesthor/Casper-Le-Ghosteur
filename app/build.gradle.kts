@@ -37,6 +37,9 @@ android {
 
     testOptions {
         unitTests.isIncludeAndroidResources = true
+        unitTests.all {
+            it.systemProperty("screenshots", project.hasProperty("screenshots").toString())
+        }
     }
 }
 

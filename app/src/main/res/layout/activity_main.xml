@@ -1,139 +1,59 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    android:id="@+id/root"
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
-    android:layout_height="match_parent"
-    android:orientation="vertical">
+    android:layout_height="match_parent">
 
-    <LinearLayout
+    <com.paulesthor.casper.BlobBackgroundView
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:gravity="center_vertical"
-        android:orientation="horizontal"
-        android:paddingHorizontal="20dp"
-        android:paddingTop="20dp"
-        android:paddingBottom="12dp">
+        android:layout_height="match_parent" />
 
-        <ImageView
-            android:layout_width="48dp"
-            android:layout_height="48dp"
-            android:importantForAccessibility="no"
-            android:src="@drawable/ic_ghost" />
-
-        <LinearLayout
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_marginStart="12dp"
-            android:layout_weight="1"
-            android:orientation="vertical">
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="@string/app_name"
-                android:textColor="@color/text_primary"
-                android:textSize="28sp"
-                android:textStyle="bold" />
-
-            <TextView
-                android:id="@+id/subtitle"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:textColor="@color/text_secondary"
-                android:textSize="14sp" />
-        </LinearLayout>
-    </LinearLayout>
-
-    <LinearLayout
-        android:id="@+id/permission_card"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginHorizontal="16dp"
-        android:layout_marginBottom="8dp"
-        android:background="@drawable/bg_card"
-        android:orientation="vertical"
-        android:padding="20dp"
-        android:visibility="gone">
-
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Casper a besoin de voir tes notifications"
-            android:textColor="@color/text_primary"
-            android:textSize="16sp"
-            android:textStyle="bold" />
-
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="6dp"
-            android:text="C'est comme ça qu'il repère les messages auxquels tu n'as pas répondu. Tout reste sur ton téléphone."
-            android:textColor="@color/text_secondary"
-            android:textSize="14sp" />
-
-        <Button
-            android:id="@+id/grant_button"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="14dp"
-            android:background="@drawable/bg_pill"
-            android:paddingHorizontal="20dp"
-            android:stateListAnimator="@null"
-            android:text="Autoriser"
-            android:textAllCaps="false"
-            android:textColor="@color/ink"
-            android:textStyle="bold" />
-    </LinearLayout>
-
+    <!-- Padded by the system bar insets in code. -->
     <FrameLayout
+        android:id="@+id/content"
         android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1">
+        android:layout_height="match_parent">
 
-        <ListView
-            android:id="@+id/list"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:clipToPadding="false"
-            android:divider="@null"
-            android:dividerHeight="0dp"
-            android:paddingHorizontal="16dp"
-            android:paddingBottom="16dp"
-            android:scrollbarStyle="outsideOverlay"
-            android:listSelector="@android:color/transparent" />
+        <include
+            android:id="@+id/page_inbox"
+            layout="@layout/page_inbox" />
+
+        <include
+            android:id="@+id/page_reminders"
+            layout="@layout/page_reminders"
+            android:visibility="gone" />
 
         <LinearLayout
-            android:id="@+id/empty"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:gravity="center"
-            android:orientation="vertical"
-            android:padding="32dp">
-
-            <ImageView
-                android:layout_width="140dp"
-                android:layout_height="140dp"
-                android:alpha="0.9"
-                android:importantForAccessibility="no"
-                android:src="@drawable/ic_ghost" />
+            android:id="@+id/tabbar"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="bottom|center_horizontal"
+            android:layout_marginBottom="16dp"
+            android:orientation="horizontal"
+            android:padding="5dp">
 
             <TextView
+                android:id="@+id/tab_inbox"
+                style="@style/Text.Name"
                 android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="16dp"
-                android:text="Personne ne t'attend"
-                android:textColor="@color/text_primary"
-                android:textSize="20sp"
-                android:textStyle="bold" />
+                android:layout_height="44dp"
+                android:drawableStart="@drawable/ic_list"
+                android:drawablePadding="8dp"
+                android:gravity="center_vertical"
+                android:paddingHorizontal="18dp"
+                android:textSize="14sp" />
 
             <TextView
+                android:id="@+id/tab_reminders"
+                style="@style/Text.Name"
                 android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="6dp"
-                android:gravity="center"
-                android:text="Casper veille sur tes messages et te dira à qui répondre."
-                android:textColor="@color/text_secondary"
+                android:layout_height="44dp"
+                android:layout_marginStart="4dp"
+                android:drawableStart="@drawable/ic_bell"
+                android:drawablePadding="8dp"
+                android:gravity="center_vertical"
+                android:paddingHorizontal="18dp"
+                android:text="Rappels"
                 android:textSize="14sp" />
         </LinearLayout>
     </FrameLayout>
-</LinearLayout>
+</FrameLayout>

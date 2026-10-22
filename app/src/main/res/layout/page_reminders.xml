@@ -1,0 +1,104 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:clipToPadding="false"
+    android:paddingBottom="96dp"
+    android:scrollbars="none">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:paddingHorizontal="16dp">
+
+        <TextView
+            style="@style/Text.Title"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:paddingHorizontal="6dp"
+            android:paddingTop="28dp"
+            android:text="Rappels" />
+
+        <TextView
+            style="@style/Text.Body"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:paddingHorizontal="6dp"
+            android:text="Casper te relance quand quelqu'un attend trop" />
+
+        <TextView
+            style="@style/Text.Section"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:paddingHorizontal="8dp"
+            android:paddingTop="28dp"
+            android:paddingBottom="10dp"
+            android:text="Personnes suivies" />
+
+        <LinearLayout
+            android:id="@+id/rules"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical" />
+
+        <FrameLayout
+            android:id="@+id/add_person"
+            android:layout_width="match_parent"
+            android:layout_height="54dp"
+            android:layout_marginTop="5dp"
+            android:background="@drawable/bg_add"
+            android:clickable="true"
+            android:focusable="true">
+
+            <TextView
+                style="@style/Text.Name"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center"
+                android:drawableStart="@drawable/ic_plus"
+                android:drawablePadding="8dp"
+                android:gravity="center_vertical"
+                android:text="Ajouter une personne"
+                android:textColor="@color/accent"
+                android:textSize="15sp" />
+        </FrameLayout>
+
+        <TextView
+            style="@style/Text.Section"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:paddingHorizontal="8dp"
+            android:paddingTop="28dp"
+            android:paddingBottom="10dp"
+            android:text="Tous les autres" />
+
+        <include
+            android:id="@+id/general_rule"
+            layout="@layout/item_rule" />
+
+        <TextView
+            style="@style/Text.Section"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:paddingHorizontal="8dp"
+            android:paddingTop="28dp"
+            android:paddingBottom="10dp"
+            android:text="Détection des réponses" />
+
+        <include
+            android:id="@+id/open_setting"
+            layout="@layout/item_rule" />
+
+        <TextView
+            style="@style/Text.Body"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:lineSpacingMultiplier="1.2"
+            android:paddingHorizontal="8dp"
+            android:text="Quand tu réponds directement depuis la notification, Casper le voit toujours tout seul."
+            android:textSize="13sp" />
+    </LinearLayout>
+</ScrollView>

@@ -14,6 +14,9 @@ import org.robolectric.RobolectricTestRunner
 class MessageExtractorTest {
 
     private val context = ApplicationProvider.getApplicationContext<android.content.Context>()
+    private fun messages(app: String, n: Notification, postTime: Long, extraApps: Set<String> = emptySet()) =
+        MessageExtractor.extract(app, n, postTime, extraApps)?.messages.orEmpty()
+
     private fun builder() = NotificationCompat.Builder(context, "test").setSmallIcon(android.R.drawable.ic_dialog_info)
 
     @Test
@@ -29,7 +32,7 @@ class MessageExtractorTest {
             )
             .build()
 
-        val messages = MessageExtractor.extract("com.whatsapp", n, 5000)
+        val messages = messages("com.whatsapp", n, 5000)
 
         assertEquals(
             listOf(
@@ -53,7 +56,7 @@ class MessageExtractorTest {
             )
             .build()
 
-        val m = MessageExtractor.extract("com.whatsapp", n, 5000).single()
+        val m = messages("com.whatsapp", n, 5000).single()
         assertEquals("Coloc", m.conversation)
         assertEquals("Tom", m.sender)
     }
@@ -69,7 +72,7 @@ class MessageExtractorTest {
 
         assertEquals(
             listOf(CapturedMessage("com.instagram.android", "julie_92", "julie_92", "t'as vu ma story ?", 4000)),
-            MessageExtractor.extract("com.instagram.android", n, 9000),
+            messages("com.instagram.android", n, 9000),
         )
     }
 
@@ -88,7 +91,7 @@ class MessageExtractorTest {
             .build()
 
         for (n in listOf(like, summary, ongoing)) {
-            assertTrue(MessageExtractor.extract("x", n, 0).isEmpty())
+            assertTrue(messages("x", n, 0).isEmpty())
         }
     }
 
@@ -99,8 +102,8 @@ class MessageExtractorTest {
             .setStyle(NotificationCompat.MessagingStyle(Person.Builder().setName("Moi").build()).addMessage("yo", 1000, lea))
             .build()
 
-        assertTrue(MessageExtractor.extract("com.discord", n, 0).isEmpty())
-        assertEquals(1, MessageExtractor.extract("com.discord", n, 0, extraApps = setOf("com.discord")).size)
+        assertTrue(messages("com.discord", n, 0).isEmpty())
+        assertEquals(1, messages("com.discord", n, 0, extraApps = setOf("com.discord")).size)
     }
 
     @Test
@@ -114,7 +117,7 @@ class MessageExtractorTest {
 
         assertEquals(
             listOf(CapturedMessage("com.google.android.dialer", "Maman", "Maman", MessageExtractor.MISSED_CALL_TEXT, 7000)),
-            MessageExtractor.extract("com.google.android.dialer", n, 9000),
+            messages("com.google.android.dialer", n, 9000),
         )
     }
 
@@ -123,7 +126,35 @@ class MessageExtractorTest {
         val incoming = builder().setCategory(Notification.CATEGORY_CALL).setContentTitle("Appel entrant").setContentText("Maman").build()
         val ongoing = builder().setCategory(Notification.CATEGORY_CALL).setContentTitle("Appel en cours").setOngoing(true).build()
 
-        assertTrue(MessageExtractor.extract("com.google.android.dialer", incoming, 0).isEmpty())
-        assertTrue(MessageExtractor.extract("com.google.android.dialer", ongoing, 0).isEmpty())
+        assertTrue(messages("com.google.android.dialer", incoming, 0).isEmpty())
+        assertTrue(messages("com.google.android.dialer", ongoing, 0).isEmpty())
+    }
+
+    @Test
+    fun inlineReplyIsReportedWithItsTime() {
+        val me = Person.Builder().setName("Moi").build()
+        val lea = Person.Builder().setName("Léa").build()
+        val n = builder()
+            .setStyle(
+                NotificationCompat.MessagingStyle(me)
+                    .addMessage("Tu viens samedi ?", 1000, lea)
+                    .addMessage("Oui !", 2000, null as Person?)
+            )
+            .build()
+
+        val extraction = MessageExtractor.extract("com.whatsapp", n, 5000)!!
+        assertEquals("Léa", extraction.conversation)
+        assertEquals(2000L, extraction.repliedAt)
+        assertEquals(1, extraction.messages.size)
+    }
+
+    @Test
+    fun noReplyMeansNoReplyTime() {
+        val lea = Person.Builder().setName("Léa").build()
+        val n = builder()
+            .setStyle(NotificationCompat.MessagingStyle(Person.Builder().setName("Moi").build()).addMessage("yo", 1000, lea))
+            .build()
+
+        assertEquals(null, MessageExtractor.extract("com.whatsapp", n, 5000)!!.repliedAt)
     }
 }

@@ -3,32 +3,24 @@ package com.paulesthor.casper
 import android.app.Notification
 import androidx.core.app.NotificationCompat
 
+/** What a notification tells us about one conversation. */
+data class Extraction(
+    val app: String,
+    val conversation: String,
+    /** Messages written by the other person (or people). */
+    val messages: List<CapturedMessage>,
+    /** Time of the user's latest own message shown in the notification (an inline reply), if any. */
+    val repliedAt: Long? = null,
+)
+
 /**
- * Turns a posted notification into the messages it carries, or nothing if it
+ * Turns a posted notification into the messages it carries, or null if it
  * isn't a message (likes, downloads, music, "checking for new messages"...).
  * Only messaging apps and missed calls are kept.
  */
 object MessageExtractor {
 
-    val MESSAGING_APPS = setOf(
-        "com.whatsapp",
-        "com.whatsapp.w4b",
-        "com.instagram.android",
-        "com.facebook.orca",
-        "com.facebook.mlite",
-        "com.google.android.apps.messaging",
-        "com.samsung.android.messaging",
-        "com.android.mms",
-    )
-
-    val DIALER_APPS = setOf(
-        "com.google.android.dialer",
-        "com.samsung.android.dialer",
-        "com.android.dialer",
-        "com.android.server.telecom",
-    )
-
-    const val MISSED_CALL_TEXT = "📞 Appel manqué"
+    const val MISSED_CALL_TEXT = "Appel manqué"
 
     /** [extraApps] are treated as messaging apps too (used to test with `adb shell cmd notification post`). */
     fun extract(
@@ -36,44 +28,44 @@ object MessageExtractor {
         notification: Notification,
         postTime: Long,
         extraApps: Set<String> = emptySet(),
-    ): List<CapturedMessage> {
+    ): Extraction? {
         val flags = notification.flags
         // WhatsApp & co. post a summary ("5 messages from 3 chats") on top of the real ones.
-        if (flags and Notification.FLAG_GROUP_SUMMARY != 0) return emptyList()
-        if (flags and Notification.FLAG_ONGOING_EVENT != 0) return emptyList()
+        if (flags and Notification.FLAG_GROUP_SUMMARY != 0) return null
+        if (flags and Notification.FLAG_ONGOING_EVENT != 0) return null
 
-        if (app in DIALER_APPS) return missedCall(app, notification, postTime)
-        if (app !in MESSAGING_APPS && app !in extraApps) return emptyList()
+        val group = AppGroup.of(app)
+        if (group == AppGroup.CALLS) return missedCall(app, notification, postTime)
+        if (group == null && app !in extraApps) return null
 
         val style = NotificationCompat.MessagingStyle.extractMessagingStyleFromNotification(notification)
         if (style != null) return fromMessagingStyle(app, notification, style, postTime)
 
-        if (notification.category != Notification.CATEGORY_MESSAGE) return emptyList()
+        if (notification.category != Notification.CATEGORY_MESSAGE) return null
 
         val extras = notification.extras
         val title = extras.getCharSequence(Notification.EXTRA_TITLE)?.toString()?.trim()
         val text = (extras.getCharSequence(Notification.EXTRA_BIG_TEXT)
             ?: extras.getCharSequence(Notification.EXTRA_TEXT))?.toString()?.trim()
-        if (title.isNullOrEmpty() || text.isNullOrEmpty()) return emptyList()
+        if (title.isNullOrEmpty() || text.isNullOrEmpty()) return null
 
-        val time = if (notification.`when` > 0) notification.`when` else postTime
-        return listOf(CapturedMessage(app, title, title, text, time))
+        return Extraction(app, title, listOf(CapturedMessage(app, title, title, text, timeOf(notification, postTime))))
     }
 
-    private fun missedCall(app: String, notification: Notification, postTime: Long): List<CapturedMessage> {
+    private fun missedCall(app: String, notification: Notification, postTime: Long): Extraction? {
         // Incoming/ongoing calls use other categories; only the missed-call notification counts.
         val missed = notification.category == "missed_call" ||
             notification.channelId?.contains("missed", ignoreCase = true) == true
-        if (!missed) return emptyList()
+        if (!missed) return null
 
         val extras = notification.extras
         // Dialers put "Missed call" in the title and the caller in the text.
         val caller = extras.getCharSequence(Notification.EXTRA_TEXT)?.toString()?.trim()
             ?.takeIf { it.isNotEmpty() }
             ?: extras.getCharSequence(Notification.EXTRA_TITLE)?.toString()?.trim()
-            ?: return emptyList()
-        val time = if (notification.`when` > 0) notification.`when` else postTime
-        return listOf(CapturedMessage(app, caller, caller, MISSED_CALL_TEXT, time))
+            ?: return null
+        val time = timeOf(notification, postTime)
+        return Extraction(app, caller, listOf(CapturedMessage(app, caller, caller, MISSED_CALL_TEXT, time)))
     }
 
     private fun fromMessagingStyle(
@@ -81,24 +73,41 @@ object MessageExtractor {
         notification: Notification,
         style: NotificationCompat.MessagingStyle,
         postTime: Long,
-    ): List<CapturedMessage> {
+    ): Extraction? {
         val me = style.user.name?.toString()
-        val conversationTitle = style.conversationTitle?.toString()
-            ?: notification.extras.getCharSequence(Notification.EXTRA_TITLE)?.toString()
+        val title = (style.conversationTitle ?: notification.extras.getCharSequence(Notification.EXTRA_TITLE))
+            ?.toString()?.trim()?.takeIf { it.isNotEmpty() }
 
-        return style.messages.mapNotNull { message ->
+        var repliedAt: Long? = null
+        val messages = mutableListOf<Pair<String, NotificationCompat.MessagingStyle.Message>>()
+        for (message in style.messages) {
             val sender = message.person?.name?.toString()
+            val time = if (message.timestamp > 0) message.timestamp else postTime
             // No sender means the message was written by the user (e.g. an inline reply).
-            if (sender.isNullOrBlank() || sender == me) return@mapNotNull null
-            val text = message.text?.toString()?.trim()
-            if (text.isNullOrEmpty()) return@mapNotNull null
-            CapturedMessage(
-                app = app,
-                conversation = conversationTitle?.trim()?.takeIf { it.isNotEmpty() } ?: sender,
-                sender = sender,
-                text = text,
-                timestamp = if (message.timestamp > 0) message.timestamp else postTime,
-            )
+            if (sender.isNullOrBlank() || sender == me) {
+                repliedAt = maxOf(repliedAt ?: 0, time)
+            } else if (!message.text?.toString()?.trim().isNullOrEmpty()) {
+                messages += sender to message
+            }
         }
+
+        val conversation = title ?: messages.firstOrNull()?.first ?: return null
+        return Extraction(
+            app = app,
+            conversation = conversation,
+            messages = messages.map { (sender, message) ->
+                CapturedMessage(
+                    app = app,
+                    conversation = conversation,
+                    sender = sender,
+                    text = message.text.toString().trim(),
+                    timestamp = if (message.timestamp > 0) message.timestamp else postTime,
+                )
+            },
+            repliedAt = repliedAt,
+        )
     }
+
+    private fun timeOf(notification: Notification, postTime: Long) =
+        if (notification.`when` > 0) notification.`when` else postTime
 }

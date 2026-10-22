@@ -45,4 +45,30 @@ class MessageStoreTest {
         assertEquals(9000, pending[0].lastTimestamp)
         assertEquals("récent", pending[0].lastText)
     }
+
+    @Test
+    fun handlingUpToAReplyKeepsLaterMessagesPending() {
+        store.insert(
+            listOf(
+                CapturedMessage("com.whatsapp", "Léa", "Léa", "avant", 1000),
+                CapturedMessage("com.whatsapp", "Léa", "Léa", "après", 3000),
+            )
+        )
+
+        assertEquals(1, store.markHandled("com.whatsapp", "Léa", upTo = 2000))
+        assertEquals(listOf("après"), store.pendingMessages("com.whatsapp", "Léa").map { it.text })
+    }
+
+    @Test
+    fun rulesAreSavedAndReadBack() {
+        val id = store.saveRule(ReminderRule(person = "Maman", groups = setOf(AppGroup.SMS, AppGroup.CALLS), delayMinutes = 60, repeatMinutes = 60))
+        assertEquals(
+            listOf(ReminderRule(id, "Maman", setOf(AppGroup.SMS, AppGroup.CALLS), 60, 60, true)),
+            store.rules(),
+        )
+        store.saveRule(store.rules().single().copy(enabled = false))
+        assertEquals(false, store.rules().single().enabled)
+        store.deleteRule(id)
+        assertEquals(emptyList<ReminderRule>(), store.rules())
+    }
 }
