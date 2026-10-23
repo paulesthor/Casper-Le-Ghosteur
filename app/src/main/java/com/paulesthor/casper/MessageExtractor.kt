@@ -11,6 +11,8 @@ data class Extraction(
     val messages: List<CapturedMessage>,
     /** Time of the user's latest own message shown in the notification (an inline reply), if any. */
     val repliedAt: Long? = null,
+    /** Which of the user's Instagram accounts received it, when the notification says. */
+    val account: String? = null,
 )
 
 /**
@@ -49,7 +51,10 @@ object MessageExtractor {
             ?: extras.getCharSequence(Notification.EXTRA_TEXT))?.toString()?.trim()
         if (title.isNullOrEmpty() || text.isNullOrEmpty()) return null
 
-        return Extraction(app, title, listOf(CapturedMessage(app, title, title, text, timeOf(notification, postTime))))
+        // The title is the sender here, so only the sub-text can name the account.
+        val account = accountOf(app, notification, candidates = emptyList(), notAccounts = setOf(title))
+        val message = CapturedMessage(app, title, title, text, timeOf(notification, postTime), account)
+        return Extraction(app, title, listOf(message), account = account)
     }
 
     private fun missedCall(app: String, notification: Notification, postTime: Long): Extraction? {
@@ -96,6 +101,11 @@ object MessageExtractor {
         }
 
         val conversation = groupTitle ?: messages.firstOrNull()?.first ?: title ?: return null
+        val account = accountOf(
+            app, notification,
+            candidates = listOf(style.conversationTitle?.takeUnless { style.isGroupConversation }, me),
+            notAccounts = messages.map { it.first }.toSet() + conversation,
+        )
         return Extraction(
             app = app,
             conversation = conversation,
@@ -106,10 +116,32 @@ object MessageExtractor {
                     sender = sender,
                     text = message.text.toString().trim(),
                     timestamp = if (message.timestamp > 0) message.timestamp else postTime,
+                    account = account,
                 )
             },
             repliedAt = repliedAt,
+            account = account,
         )
+    }
+
+    private val NOT_A_NAME = setOf("vous", "you", "moi", "me")
+
+    /**
+     * The receiving account, for Instagram only: it shows the user's own username in the
+     * notification (sub-text, title, or as "me" in the conversation), never the sender's.
+     */
+    private fun accountOf(
+        app: String,
+        notification: Notification,
+        candidates: List<CharSequence?>,
+        notAccounts: Set<String>,
+    ): String? {
+        if (AppGroup.of(app) != AppGroup.INSTAGRAM) return null
+        val extras = notification.extras
+        return (listOf(extras.getCharSequence(Notification.EXTRA_SUB_TEXT)) + candidates +
+            extras.getCharSequence(Notification.EXTRA_TITLE))
+            .mapNotNull { it?.toString()?.trim()?.removePrefix("@")?.takeIf { name -> name.isNotEmpty() } }
+            .firstOrNull { it !in notAccounts && it.lowercase() !in NOT_A_NAME }
     }
 
     private fun timeOf(notification: Notification, postTime: Long) =

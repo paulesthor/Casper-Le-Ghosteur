@@ -219,6 +219,43 @@ class MainActivity : Activity() {
             container.addView(row)
         }
 
+        val accounts = store.accounts()
+        findViewById<View>(R.id.accounts_section).visibility = if (accounts.isEmpty()) View.GONE else View.VISIBLE
+        val accountRows = findViewById<LinearLayout>(R.id.accounts)
+        accountRows.removeAllViews()
+        for (account in accounts) {
+            val handle = "@${account.name}"
+            val row = LayoutInflater.from(this).inflate(R.layout.item_rule, accountRows, false)
+            row.findViewById<View>(R.id.avatar_frame).bindAvatar(account.name, AppGroup.INSTAGRAM)
+            bindRuleRow(
+                row,
+                name = handle,
+                line1 = if (account.enabled) {
+                    "Suivi · ${account.messagesThisWeek} message${if (account.messagesThisWeek > 1) "s" else ""} cette semaine"
+                } else {
+                    "Ignoré · ses messages ne sont pas suivis"
+                },
+                line2 = null,
+                checked = account.enabled,
+                onToggle = { follow ->
+                    if (follow) {
+                        store.enableAccount(account.app, account.name)
+                    } else {
+                        val disabledAt = store.disableAccount(account.app, account.name)
+                        showSnack("Messages de <b>${android.text.Html.escapeHtml(handle)}</b> retirés", "Annuler") {
+                            store.enableAccount(account.app, account.name, undoDisabledAt = disabledAt)
+                            ReminderScheduler.reschedule(this)
+                            refresh()
+                        }
+                    }
+                    ReminderScheduler.reschedule(this)
+                    refresh()
+                },
+                onClick = null,
+            )
+            accountRows.addView(row)
+        }
+
         val quiet = settings.quietHours
         findViewById<View>(R.id.quiet_rule).let { row ->
             showIcon(row, R.drawable.ic_moon)

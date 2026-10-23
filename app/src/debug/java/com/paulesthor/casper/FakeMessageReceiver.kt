@@ -12,6 +12,7 @@ import android.util.Log
  *       --es app whatsapp --es from Lea --es text 'Tu viens samedi ?' [--es group Coloc] [--ei ago 90]"
  *
  * app: whatsapp, instagram, messenger, sms or appel. ago: how many minutes ago it arrived.
+ * account: the Instagram account it was sent to (--es account boutique_pro); unfollowed accounts are skipped.
  */
 class FakeMessageReceiver : BroadcastReceiver() {
 
@@ -28,8 +29,15 @@ class FakeMessageReceiver : BroadcastReceiver() {
         val text = if (group == AppGroup.CALLS) MessageExtractor.MISSED_CALL_TEXT else intent.getStringExtra("text") ?: "Coucou"
         val time = System.currentTimeMillis() - intent.getIntExtra("ago", 0) * 60_000L
 
-        val message = CapturedMessage(group.packages.first(), conversation, from, text, time)
-        MessageStore.get(context).insert(listOf(message))
+        val account = intent.getStringExtra("account")?.removePrefix("@")
+        val message = CapturedMessage(group.packages.first(), conversation, from, text, time, account)
+        val store = MessageStore.get(context)
+        if (account != null && !store.noteAccount(message.app, account)) {
+            Log.i(MessageListenerService.TAG, "skipped account=$account (account not followed)")
+            MessageListenerService.onNewMessages?.invoke()
+            return
+        }
+        store.insert(listOf(message))
         ReminderScheduler.reschedule(context)
         MessageListenerService.onNewMessages?.invoke()
         Log.i(MessageListenerService.TAG, "fake app=${message.app} conversation=$conversation sender=$from text=$text")

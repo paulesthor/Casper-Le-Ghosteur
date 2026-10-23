@@ -87,4 +87,25 @@ class MessageStoreTest {
         assertEquals(listOf("nouveau"), store.pendingMessages("com.whatsapp", "Léa").map { it.text })
         assertEquals(ReminderState(lastRemindedAt = 4242), store.reminderState("com.whatsapp", "Léa"))
     }
+
+    @Test
+    fun unfollowingAnAccountHidesItsMessagesUntilUndone() {
+        val ig = "com.instagram.android"
+        assertEquals(true, store.noteAccount(ig, "perso"))
+        assertEquals(true, store.noteAccount(ig, "boutique_pro"))
+        store.insert(
+            listOf(
+                CapturedMessage(ig, "julie_92", "julie_92", "coucou", 1000, account = "perso"),
+                CapturedMessage(ig, "client_1", "client_1", "dispo ?", 2000, account = "boutique_pro"),
+            )
+        )
+
+        val at = store.disableAccount(ig, "boutique_pro")
+        assertEquals(false, store.noteAccount(ig, "boutique_pro"))
+        assertEquals(listOf("julie_92"), store.pendingConversations().map { it.conversation })
+        assertEquals(listOf("perso" to true, "boutique_pro" to false), store.accounts().map { it.name to it.enabled })
+
+        store.enableAccount(ig, "boutique_pro", undoDisabledAt = at)
+        assertEquals(listOf("julie_92", "client_1"), store.pendingConversations().map { it.conversation })
+    }
 }

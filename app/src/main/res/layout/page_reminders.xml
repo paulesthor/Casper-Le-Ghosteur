@@ -28,6 +28,39 @@
             android:paddingHorizontal="6dp"
             android:text="Casper te relance quand quelqu'un attend trop" />
 
+        <LinearLayout
+            android:id="@+id/accounts_section"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:visibility="gone">
+
+            <TextView
+                style="@style/Text.Section"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:paddingHorizontal="8dp"
+                android:paddingTop="28dp"
+                android:paddingBottom="10dp"
+                android:text="Comptes Instagram" />
+
+            <LinearLayout
+                android:id="@+id/accounts"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical" />
+
+            <TextView
+                style="@style/Text.Body"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:lineSpacingMultiplier="1.2"
+                android:paddingHorizontal="8dp"
+                android:text="Les comptes apparaissent ici dès leur première notification. Un compte désactivé n'apparaît plus dans la liste, les rappels ni le widget."
+                android:textSize="13sp" />
+        </LinearLayout>
+
         <TextView
             style="@style/Text.Section"
             android:layout_width="wrap_content"

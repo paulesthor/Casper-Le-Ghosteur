@@ -63,6 +63,13 @@ class ScreenshotTest {
             .setSmallIcon(android.R.drawable.ic_dialog_info).addAction(replyAction).build()
         ConversationOpener.rememberReply("com.whatsapp", "Léa", notification)
 
+        store.noteAccount("com.instagram.android", "lea.martin")
+        store.insert(listOf(CapturedMessage("com.instagram.android", "julie_92", "julie_92", "coucou", now - 2 * 24 * h, account = "lea.martin")))
+        store.noteAccount("com.instagram.android", "lea_boutique")
+        store.disableAccount("com.instagram.android", "lea_boutique")
+        store.noteAccount("com.instagram.android", "studio.lm")
+        store.disableAccount("com.instagram.android", "studio.lm")
+
         store.saveRule(ReminderRule(person = "Maman", groups = setOf(AppGroup.WHATSAPP, AppGroup.SMS, AppGroup.CALLS), delayMinutes = 60, repeatMinutes = 60))
         store.saveRule(ReminderRule(person = "Coloc", groups = setOf(AppGroup.WHATSAPP), delayMinutes = 180))
         store.saveRule(ReminderRule(person = "Hugo Martin", groups = setOf(AppGroup.MESSENGER), delayMinutes = 30, enabled = false))

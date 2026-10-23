@@ -11,12 +11,17 @@ class MessageListenerService : NotificationListenerService() {
     override fun onNotificationPosted(sbn: StatusBarNotification) {
         val extraction = read(sbn) ?: return
         val (app, conversation) = extraction.app to extraction.conversation
+        if (extraction.account != null && !store.noteAccount(app, extraction.account)) {
+            Log.i(TAG, "skipped app=$app account=${extraction.account} (account not followed)")
+            onNewMessages?.invoke()
+            return
+        }
 
         val inserted = store.insert(extraction.messages)
         ConversationOpener.remember(app, conversation, sbn.notification.contentIntent)
         ConversationOpener.rememberReply(app, conversation, sbn.notification)
         extraction.messages.forEach {
-            Log.i(TAG, "captured app=${it.app} conversation=${it.conversation} sender=${it.sender} text=${it.text}")
+            Log.i(TAG, "captured app=${it.app} account=${it.account} conversation=${it.conversation} sender=${it.sender} text=${it.text}")
         }
 
         // The user answered from the notification itself: what came before is answered.

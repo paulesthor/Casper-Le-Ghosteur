@@ -176,5 +176,29 @@ class MessageExtractorTest {
         val extraction = MessageExtractor.extract("com.instagram.android", n, 5000)!!
         assertEquals("julie_92", extraction.conversation)
         assertEquals("julie_92", extraction.messages.single().conversation)
+        // ...and the username it showed is the account the message was sent to.
+        assertEquals("paul.esthor", extraction.account)
+        assertEquals("paul.esthor", extraction.messages.single().account)
+    }
+
+    @Test
+    fun instagramAccountCanComeFromTheSubText() {
+        val n = builder()
+            .setCategory(Notification.CATEGORY_MESSAGE)
+            .setContentTitle("julie_92")
+            .setContentText("coucou")
+            .setSubText("@boutique_pro")
+            .build()
+
+        assertEquals("boutique_pro", MessageExtractor.extract("com.instagram.android", n, 0)!!.account)
+    }
+
+    @Test
+    fun otherAppsHaveNoAccount() {
+        val me = Person.Builder().setName("Moi").build()
+        val lea = Person.Builder().setName("Léa").build()
+        val n = builder().setStyle(NotificationCompat.MessagingStyle(me).addMessage("yo", 1000, lea)).build()
+
+        assertEquals(null, MessageExtractor.extract("com.whatsapp", n, 0)!!.account)
     }
 }

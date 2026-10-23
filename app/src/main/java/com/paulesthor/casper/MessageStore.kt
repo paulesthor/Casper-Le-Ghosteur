@@ -19,7 +19,7 @@ data class Conversation(
 data class Person(val name: String, val groups: Set<AppGroup>)
 
 class MessageStore(context: Context) :
-    SQLiteOpenHelper(context.applicationContext, "messages.db", null, 3) {
+    SQLiteOpenHelper(context.applicationContext, "messages.db", null, 4) {
 
     override fun onCreate(db: SQLiteDatabase) {
         db.execSQL(
@@ -33,16 +33,35 @@ class MessageStore(context: Context) :
                 ts INTEGER NOT NULL,
                 handled INTEGER NOT NULL DEFAULT 0,
                 handled_at INTEGER,
+                account TEXT,
                 UNIQUE(app, conversation, sender, text, ts)
             )
             """.trimIndent()
         )
         createReminderTables(db)
+        createAccountsTable(db)
     }
 
     override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
         if (oldVersion < 2) createReminderTables(db)
         if (oldVersion < 3) db.execSQL("ALTER TABLE messages ADD COLUMN handled_at INTEGER")
+        if (oldVersion < 4) {
+            db.execSQL("ALTER TABLE messages ADD COLUMN account TEXT")
+            createAccountsTable(db)
+        }
+    }
+
+    private fun createAccountsTable(db: SQLiteDatabase) {
+        db.execSQL(
+            """
+            CREATE TABLE accounts (
+                app TEXT NOT NULL,
+                name TEXT NOT NULL,
+                enabled INTEGER NOT NULL DEFAULT 1,
+                PRIMARY KEY (app, name)
+            )
+            """.trimIndent()
+        )
     }
 
     private fun createReminderTables(db: SQLiteDatabase) {
@@ -84,6 +103,7 @@ class MessageStore(context: Context) :
                         put("sender", m.sender)
                         put("text", m.text)
                         put("ts", m.timestamp)
+                        put("account", m.account)
                     }
                     if (insertWithOnConflict("messages", null, values, SQLiteDatabase.CONFLICT_IGNORE) != -1L) {
                         inserted++
@@ -164,6 +184,53 @@ class MessageStore(context: Context) :
             arrayOf(undo.app, undo.conversation, undo.handledAt),
         )
         if (undo.reminders != ReminderState()) saveReminderState(undo.app, undo.conversation, undo.reminders)
+    }
+
+    data class Account(val app: String, val name: String, val enabled: Boolean, val messagesThisWeek: Int)
+
+    /** Remembers one of the user's own accounts (new ones are followed); returns whether it's followed. */
+    fun noteAccount(app: String, name: String): Boolean {
+        writableDatabase.insertWithOnConflict(
+            "accounts", null,
+            ContentValues().apply { put("app", app); put("name", name); put("enabled", 1) },
+            SQLiteDatabase.CONFLICT_IGNORE,
+        )
+        return readableDatabase.rawQuery(
+            "SELECT enabled FROM accounts WHERE app = ? AND name = ?", arrayOf(app, name),
+        ).use { it.moveToFirst() && it.getInt(0) == 1 }
+    }
+
+    fun accounts(now: Long = System.currentTimeMillis()): List<Account> =
+        readableDatabase.rawQuery(
+            """
+            SELECT a.app, a.name, a.enabled,
+                   (SELECT COUNT(*) FROM messages m WHERE m.app = a.app AND m.account = a.name AND m.ts > ?)
+            FROM accounts a ORDER BY a.enabled DESC, a.name COLLATE NOCASE
+            """.trimIndent(),
+            arrayOf((now - 7 * 24 * 3_600_000L).toString()),
+        ).use { c ->
+            buildList { while (c.moveToNext()) add(Account(c.getString(0), c.getString(1), c.getInt(2) == 1, c.getInt(3))) }
+        }
+
+    /** Stops following an account and takes its pending messages off the list; [undo] puts both back. */
+    fun disableAccount(app: String, name: String): Long {
+        val at = System.currentTimeMillis()
+        writableDatabase.execSQL("UPDATE accounts SET enabled = 0 WHERE app = ? AND name = ?", arrayOf(app, name))
+        writableDatabase.execSQL(
+            "UPDATE messages SET handled = 1, handled_at = ? WHERE app = ? AND account = ? AND handled = 0",
+            arrayOf(at, app, name),
+        )
+        return at
+    }
+
+    fun enableAccount(app: String, name: String, undoDisabledAt: Long? = null) {
+        writableDatabase.execSQL("UPDATE accounts SET enabled = 1 WHERE app = ? AND name = ?", arrayOf(app, name))
+        if (undoDisabledAt != null) {
+            writableDatabase.execSQL(
+                "UPDATE messages SET handled = 0, handled_at = NULL WHERE app = ? AND account = ? AND handled_at = ?",
+                arrayOf(app, name, undoDisabledAt),
+            )
+        }
     }
 
     /** Everyone seen so far, most recent first, to pick who gets their own reminder. */
